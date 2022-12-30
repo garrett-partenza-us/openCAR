@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:t4:1
+#SBATCH --time=08:00:00
+#SBATCH --job-name=sr
+#SBATCH --mem=32GB
+#SBATCH --ntasks=1
+module load gcc/10.1.0
+cd /home/partenza.g/sr/espcnn
+source env/bin/activate
+python train.py
