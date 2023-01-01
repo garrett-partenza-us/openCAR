@@ -12,7 +12,7 @@ class MSGE(nn.Module):
         super(MSGE, self).__init__()
         self.name = "MSGE"
         self.mse = MSELoss()
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = "cpu"
         self.batch = batch
         self.eps = torch.tensor(eps).to(self.device)
         self.grad_weight = torch.tensor(grad_weight).to(self.device)
