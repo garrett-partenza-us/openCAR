@@ -29,10 +29,10 @@ def bilinear_interpolate_torch(im, x, y):
     
     # Channel last
     im = im.permute(1,2,0)
-    x0 = torch.floor(x).type(dtype_long)
+    x0 = torch.floor(x)
     x1 = x0 + 1
     
-    y0 = torch.floor(y).type(dtype_long)
+    y0 = torch.floor(y)
     y1 = y0 + 1
 
     x0 = torch.clamp(x0, 0, im.shape[1]-1)
@@ -45,10 +45,10 @@ def bilinear_interpolate_torch(im, x, y):
     Ic = im[ y0, x1 ][0]
     Id = im[ y1, x1 ][0]
     
-    wa = (x1.type(dtype)-x) * (y1.type(dtype)-y)
-    wb = (x1.type(dtype)-x) * (y-y0.type(dtype))
-    wc = (x-x0.type(dtype)) * (y1.type(dtype)-y)
-    wd = (x-x0.type(dtype)) * (y-y0.type(dtype))
+    wa = (x1-x) * (y1-y)
+    wb = (x1-x) * (y-y0)
+    wc = (x-x0) * (y1-y)
+    wd = (x-x0) * (y-y0)
 
     return torch.t((torch.t(Ia)*wa)) + torch.t(torch.t(Ib)*wb) + torch.t(torch.t(Ic)*wc) + torch.t(torch.t(Id)*wd)
 
@@ -60,22 +60,27 @@ kernels, offsets_h, offsets_v = kernels.permute(1,2,0), offsets_h.permute(1,2,0)
 kernels, offsets_h, offsets_v = kernels.reshape(*kernels.size()[:-1], 3, 3), offsets_h.reshape(*offsets_h.size()[:-1], 3, 3), offsets_v.reshape(*offsets_v.size()[:-1], 3, 3)
 
 # original hr image
-hr = images[0]
-lr_pixels = []
-for x in tqdm(range(kernels.shape[0])):
-    for y in tqdm(range(kernels.shape[1]), desc=" inner loop", position=1, leave=False):
-        u, v = x+0.5*SCALE-0.5, y+0.5*SCALE-0.5
-        for c in range(3):
-            res = torch.zeros(1)
-            for i in range(KSIZE):
-                for j in range(KSIZE):
-                    kernel_val = kernels[x][y][i][j]
-                    k, q = u+i-(KSIZE/2)+offsets_h[x][y][i][j], v+j-(KSIZE/2)+offsets_v[x][y][i][j]
-                    hr_pix = bilinear_interpolate_torch(torch.unsqueeze(hr[c], 0), k, q)
-                    res+=kernel_val*hr_pix
-            lr_pixels.append(res)
+out = []
+for batch in images.shape[0]:
+    hr = hr[batch]
+    lr_pixels = []
+    for x in tqdm(range(kernels.shape[0])):
+        for y in tqdm(range(kernels.shape[1]), desc=" inner loop", position=1, leave=False):
+            u, v = x+0.5*SCALE-0.5, y+0.5*SCALE-0.5
+            for c in range(3):
+                res = torch.zeros(1)
+                for i in range(KSIZE):
+                    for j in range(KSIZE):
+                        kernel_val = kernels[x][y][i][j]
+                        k, q = u+i-(KSIZE/2)+offsets_h[x][y][i][j], v+j-(KSIZE/2)+offsets_v[x][y][i][j]
+                        hr_pix = bilinear_interpolate_torch(torch.unsqueeze(hr[c], 0), k, q)
+                        res+=kernel_val*hr_pix
+                lr_pixels.append(res)
                     
-lr = torch.stack(lr_pixels, 0).reshape(1,3,48,48)
+    lr = torch.stack(lr_pixels, 0).reshape(1,3,48,48)
+    out.append(lr)
+out = torch.stack(out, 0)
+
 out = upsampler_net(lr)
 out = torch.clamp(out, 0, 1)
 out = torch.round(out * 255)

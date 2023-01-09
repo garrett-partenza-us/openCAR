@@ -12,3 +12,4 @@ To do...
 9. Add soft round after downscaling module to simulate real low resolution image input
 10. Verify bilinear interpolation module is correct with respect to equation 3
 11. Understand and verify the gradient formulas in equations 4-6 match with torch gradient graph
+12. Correct for ksize and offset unit parameters in 4.1.2

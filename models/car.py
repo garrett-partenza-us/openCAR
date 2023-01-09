@@ -6,10 +6,6 @@ LEAKY_FACTOR = 0.2
 RES_FACTOR = 1.0
 
 
-"""
-Subtract RGB means for standardization.
-Why is the standard deviation 1.0?
-https://github.com/sunwj/CAR/blob/05b22776b9f690dac94ced8baeb455bb722c0997/modules.py#L105"""
 class MeanShift(nn.Conv2d):
     def __init__(self, rgb_range, rgb_mean=(0.5, 0.5, 0.5), rgb_std=(1.0, 1.0, 1.0), sign=-1):
         super(MeanShift, self).__init__(in_channels=3, out_channels=3, kernel_size=1)
@@ -21,35 +17,21 @@ class MeanShift(nn.Conv2d):
             
             
 class PixelUnshuffle(nn.Module):
-    """
-    Inverse process of pytorch pixel shuffle module
-    """
     def __init__(self, down_scale):
-        """
-        :param down_scale: int, down scale factor
-        """
         super(PixelUnshuffle, self).__init__()
-
         if not isinstance(down_scale, int):
             raise ValueError('Down scale factor must be a integer number')
         self.down_scale = down_scale
 
     def forward(self, input):
-        """
-        :param input: tensor of shape (batch size, channels, height, width)
-        :return: tensor of shape(batch size, channels * down_scale * down_scale, height / down_scale, width / down_scale)
-        """
         b, c, h, w = input.size()
         assert h % self.down_scale == 0
         assert w % self.down_scale == 0
-
         oc = c * self.down_scale ** 2
         oh = int(h / self.down_scale)
         ow = int(w / self.down_scale)
-
         output_reshaped = input.reshape(b, c, oh, self.down_scale, ow, self.down_scale)
         output = output_reshaped.permute(0, 1, 3, 5, 2, 4).reshape(b, oc, oh, ow)
-
         return output
 
 
@@ -80,18 +62,16 @@ class UpsampleBlock(nn.Module):
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size):
         super(ResidualBlock, self).__init__()
-        self.pad = nn.ReflectionPad2d(kernel_size//2)
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size)
-        self.conv2 = nn.Conv2d(in_channels, out_channels, kernel_size)
-        self.act = nn.LeakyReLU(LEAKY_FACTOR)
+        self.transform = nn.Sequential(
+            nn.ReflectionPad2d(kernel_size//2),
+            nn.Conv2d(in_channels, out_channels, kernel_size),
+            nn.LeakyReLU(LEAKY_FACTOR),
+            nn.ReflectionPad2d(kernel_size//2),
+            nn.Conv2d(in_channels, out_channels, kernel_size)
+        )
         
     def forward(self, x):
-        x = self.pad(x)
-        x = self.conv1(x)
-        x = self.act(x)
-        x = self.pad(x)
-        x = self.conv2(x)
-        return x
+        return x + self.transform(x) * RES_FACTOR
         
 
 class TrunkBlock(nn.Module):
@@ -132,7 +112,10 @@ class ResamplerNet(nn.Module):
         
         self.ds_2 = DownsampleBlock(2, 64, 128)
         self.ds_4 = DownsampleBlock(2, 128, 128)
-        self.res = [ResidualBlock(128, 128, 3) for _ in range(res_blocks)]
+        res_4 = list()
+        for idx in range(res_blocks):
+            res_4 += [ResidualBlock(128, 128, 3)]
+        self.res_4 = nn.Sequential(*res_4)
         self.ds_8 = DownsampleBlock(2, 128, 256)
         
         self.kernel_trunk = TrunkBlock(2, 256, 256)
@@ -169,8 +152,7 @@ class ResamplerNet(nn.Module):
         x = self.ds_1(x)
         x = self.ds_2(x)
         x = self.ds_4(x)
-        for block in self.res:
-            x = x + block(x) * RES_FACTOR
+        x = self.res_4(x)
         x = self.ds_8(x)
         
         kernels = self.kernel_trunk(x)
@@ -179,5 +161,7 @@ class ResamplerNet(nn.Module):
         
         offsets = self.offset_trunk(x)
         offsets_h, offsets_v = self.offset_h_prediction(offsets), self.offset_v_prediction(offsets)
-        
+    
         return kernels, offsets_h, offsets_v
+    
+    
