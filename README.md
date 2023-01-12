@@ -4,7 +4,7 @@
 
 [Original Paper](https://arxiv.org/abs/1907.12904)
 
-The original PyTorch implementation, which was opened source by the authors, does include the necessary code for training your own models. More specifically, the CUDA kernels and custom PyTorch module the authors opened sourced raises a NotImplemented error when attempting to propegate gradients through the graph with loss.backward(). You can find this issue on line 32 of the author's [gridsampler.py](https://github.com/sunwj/CAR/blob/master/adaptive_gridsampler/gridsampler.py).
+The original PyTorch implementation, which was opened source by the authors, does not include the necessary code for training your own models. More specifically, the CUDA kernels and custom PyTorch module the authors opened sourced raises a NotImplemented error when attempting to propegate gradients through the graph with loss.backward(). You can find this issue on line 32 of the author's [gridsampler.py](https://github.com/sunwj/CAR/blob/master/adaptive_gridsampler/gridsampler.py).
 
 So far, this repository implements the authors model entirely in the PyTorch machine learning framework. The end goal is to rewrite the downsampler code as CUDA kernels to speed up training. Pure PyTorch implementation takes around one minute for a single optimization step with a 96x96 image patch. 
 
