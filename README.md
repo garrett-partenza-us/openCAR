@@ -10,7 +10,7 @@ So far, this repository implements the authors model entirely in the PyTorch mac
 
 To do...
 1. Add image data augmentation (random flips, etc)
-2. Determine max batch size for training
+2. Determine max batch size for training on 8G GPU
 3. Add spatial offset loss (equation 9)
 4. Add beta paramters of 0.9 and 0.999 to Adam optimizer
 5. Add validation loss in traing loop
